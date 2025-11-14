@@ -21,13 +21,14 @@
     </Window.TaskbarItemInfo>
     
     <Grid x:Name="MainGrid" IsHitTestVisible="False">
-        <!-- Outer Border with Gradient Effect -->
-        <Rectangle x:Name="EdgeLightBorder" 
-                   RadiusX="20" 
-                   RadiusY="20"
-                   StrokeThickness="80"
-                   Opacity="0.95">
-            <Rectangle.Stroke>
+        <!-- Edge Light Frame with Rounded Inner and Outer Edges using Path -->
+        <Path x:Name="EdgeLightBorder" 
+              Margin="20" 
+              Opacity="0.95"
+              Stretch="None"
+              HorizontalAlignment="Stretch"
+              VerticalAlignment="Stretch">
+            <Path.Fill>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                     <GradientStop Color="#FFFFFF" Offset="0.0"/>
                     <GradientStop Color="#F0F0F0" Offset="0.3"/>
@@ -35,11 +36,11 @@
                     <GradientStop Color="#F0F0F0" Offset="0.7"/>
                     <GradientStop Color="#FFFFFF" Offset="1.0"/>
                 </LinearGradientBrush>
-            </Rectangle.Stroke>
-            <Rectangle.Effect>
+            </Path.Fill>
+            <Path.Effect>
                 <BlurEffect Radius="8"/>
-            </Rectangle.Effect>
-        </Rectangle>
+            </Path.Effect>
+        </Path>
         
         <!-- Control Panel (Top-Right Corner) -->
         <StackPanel x:Name="ControlPanel" 

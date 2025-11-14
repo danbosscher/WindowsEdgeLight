@@ -101,7 +101,7 @@ public partial class MainWindow : Window
 • Right-click taskbar icon for menu
 
 Created by Scott Hanselman
-Version 0.3";
+Version 0.5";
 
         System.Windows.MessageBox.Show(helpMessage, "Windows Edge Light - Help", 
             MessageBoxButton.OK, MessageBoxImage.Information);
@@ -132,13 +132,12 @@ Version 0.3";
         this.Width = workingArea.Width / dpiScaleX;
         this.Height = workingArea.Height / dpiScaleY;
         this.WindowState = System.Windows.WindowState.Normal;
-
-        EdgeLightBorder.Margin = new Thickness(20);
     }
 
     private void Window_Loaded(object sender, RoutedEventArgs e)
     {
         SetupWindow();
+        CreateFrameGeometry();
         
         var hwnd = new WindowInteropHelper(this).Handle;
         int extendedStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
@@ -152,6 +151,32 @@ Version 0.3";
         // Hook into Windows message processing
         HwndSource source = HwndSource.FromHwnd(hwnd);
         source.AddHook(HwndHook);
+    }
+
+    private void CreateFrameGeometry()
+    {
+        // Get actual dimensions (accounting for margin)
+        double width = this.ActualWidth - 40;  // 20px margin on each side
+        double height = this.ActualHeight - 40;
+        
+        const double frameThickness = 80;
+        const double outerRadius = 100;  // Extra rounded like macOS
+        const double innerRadius = 60;   // Keep proportional
+        
+        // Outer rounded rectangle
+        var outerRect = new RectangleGeometry(new Rect(0, 0, width, height), outerRadius, outerRadius);
+        
+        // Inner rounded rectangle
+        var innerRect = new RectangleGeometry(
+            new Rect(frameThickness, frameThickness, 
+                    width - (frameThickness * 2), 
+                    height - (frameThickness * 2)), 
+            innerRadius, innerRadius);
+        
+        // Combine: outer minus inner = frame
+        var frameGeometry = new CombinedGeometry(GeometryCombineMode.Exclude, outerRect, innerRect);
+        
+        EdgeLightBorder.Data = frameGeometry;
     }
 
     private IntPtr HwndHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
