@@ -56,11 +56,19 @@ jobs:
           $version = "${{ github.event.inputs.version }}"
         }
         
-        # Create ZIP files only (contain clean WindowsEdgeLight.exe inside)
-        Compress-Archive -Path "WindowsEdgeLight/bin/Release/net10.0-windows/win-x64/publish/*" `
-                        -DestinationPath "artifacts/WindowsEdgeLight-v$version-win-x64.zip"
-        Compress-Archive -Path "WindowsEdgeLight/bin/Release/net10.0-windows/win-arm64/publish/*" `
-                        -DestinationPath "artifacts/WindowsEdgeLight-v$version-win-arm64.zip"
+        # Create ZIP files with exe and README (so Updatum treats as portable app)
+        New-Item -ItemType Directory -Path "temp-x64" -Force
+        Copy-Item "WindowsEdgeLight/bin/Release/net10.0-windows/win-x64/publish/WindowsEdgeLight.exe" -Destination "temp-x64/"
+        Copy-Item "README.md" -Destination "temp-x64/"
+        Compress-Archive -Path "temp-x64/*" -DestinationPath "artifacts/WindowsEdgeLight-v$version-win-x64.zip"
+        
+        New-Item -ItemType Directory -Path "temp-arm64" -Force
+        Copy-Item "WindowsEdgeLight/bin/Release/net10.0-windows/win-arm64/publish/WindowsEdgeLight.exe" -Destination "temp-arm64/"
+        Copy-Item "README.md" -Destination "temp-arm64/"
+        Compress-Archive -Path "temp-arm64/*" -DestinationPath "artifacts/WindowsEdgeLight-v$version-win-arm64.zip"
+        
+        Remove-Item "temp-x64" -Recurse -Force
+        Remove-Item "temp-arm64" -Recurse -Force
                   
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
@@ -85,7 +93,7 @@ jobs:
           - **WindowsEdgeLight-${{ github.ref_name }}-win-x64.zip** - For Intel/AMD 64-bit Windows
           - **WindowsEdgeLight-${{ github.ref_name }}-win-arm64.zip** - For ARM64 Windows (Surface Pro X, etc.)
           
-          **What's inside:** Each ZIP contains `WindowsEdgeLight.exe` (self-contained, no .NET required)
+          **What's inside:** Each ZIP contains `WindowsEdgeLight.exe` and `README.md` (self-contained, no .NET required)
           
           ### ✨ What's New
           

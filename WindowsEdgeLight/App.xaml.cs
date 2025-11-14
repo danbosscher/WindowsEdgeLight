@@ -16,10 +16,8 @@ public partial class App : System.Windows.Application
         // Default pattern (win-x64) will match our ZIP assets
         // ZIP files contain clean WindowsEdgeLight.exe inside
         FetchOnlyLatestRelease = true, // Saves GitHub API rate limits
-        // Specify the executable name inside the ZIP (without .exe extension)
+        // Specify the executable name for single-file app (without .exe extension)
         InstallUpdateSingleFileExecutableName = "WindowsEdgeLight",
-        // For MSI installer, show basic UI during installation
-        InstallUpdateWindowsInstallerArguments = "/qb",
     };
 
     protected override async void OnStartup(StartupEventArgs e)
