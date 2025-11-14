@@ -15,8 +15,8 @@ public partial class App : System.Windows.Application
     {
         // Asset pattern matches: WindowsEdgeLight-v0.6-win-x64.exe or .zip
         AssetRegexPattern = $"WindowsEdgeLight.*win-x64",
-        // Prefer ZIP files for easier updates
-        AssetExtensionFilter = "zip",
+        // Note: Removed AssetExtensionFilter to let Updatum choose the best option
+        // EXE files work better on Windows (less antivirus interference)
         // For MSI installer, show basic UI during installation
         InstallUpdateWindowsInstallerArguments = "/qb",
     };
@@ -64,19 +64,33 @@ public partial class App : System.Windows.Application
 
     private async Task DownloadAndInstallUpdateAsync()
     {
+        DownloadProgressDialog? progressDialog = null;
         try
         {
-            var progressDialog = new DownloadProgressDialog(AppUpdater);
+            progressDialog = new DownloadProgressDialog(AppUpdater);
             progressDialog.Show();
 
             var downloadedAsset = await AppUpdater.DownloadUpdateAsync();
 
-            progressDialog.Close();
+            // Close progress dialog before showing message boxes
+            if (progressDialog != null)
+            {
+                progressDialog.Close();
+                progressDialog = null;
+            }
 
             if (downloadedAsset == null)
             {
                 MessageBox.Show("Failed to download the update. Please try again later.",
                     "Download Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            // Verify the file still exists
+            if (!System.IO.File.Exists(downloadedAsset.FilePath))
+            {
+                MessageBox.Show($"Update file was deleted or is inaccessible:\n{downloadedAsset.FilePath}\n\nThis may be caused by antivirus software.",
+                    "Update File Missing", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
@@ -93,10 +107,22 @@ public partial class App : System.Windows.Application
                 // If installation succeeds, the app will be terminated
             }
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            MessageBox.Show($"Access denied when accessing update file. Please check:\n\n1. Antivirus may be blocking the update\n2. Windows SmartScreen may need approval\n3. Temp folder permissions\n\nError: {ex.Message}",
+                "Access Denied", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
         catch (Exception ex)
         {
-            MessageBox.Show($"Failed to download or install update: {ex.Message}",
+            MessageBox.Show($"Failed to download or install update: {ex.Message}\n\nTry running as administrator or check antivirus settings.",
                 "Update Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            if (progressDialog != null)
+            {
+                progressDialog.Close();
+            }
         }
     }
 }
