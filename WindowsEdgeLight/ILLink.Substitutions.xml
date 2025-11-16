@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<linker>
+  <!-- Optimize System assemblies -->
+  <assembly fullname="System.Linq.Expressions">
+    <type fullname="System.Linq.Expressions.Interpreter.LightCompiler">
+      <method signature="System.Void .cctor()" body="stub" value="0" />
+    </type>
+  </assembly>
+  
+  <!-- Reduce diagnostic overhead -->
+  <assembly fullname="System.Diagnostics.DiagnosticSource">
+    <type fullname="System.Diagnostics.DiagnosticListener">
+      <method signature="System.Void .cctor()" body="stub" value="0" />
+    </type>
+  </assembly>
+</linker>

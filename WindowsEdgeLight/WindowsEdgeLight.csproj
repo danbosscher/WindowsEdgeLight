@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -56,14 +56,16 @@
     <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
     <RetainVMGarbageCollection>false</RetainVMGarbageCollection>
   </PropertyGroup>
-  <ItemGroup>
+  
+  <ItemGroup>
     <Content Include="ringlight_cropped.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Updatum" Version="1.1.6" />
-  </ItemGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="Updatum" Version="1.1.6" />
+  </ItemGroup>
   
   <!-- Trimming configuration for WPF -->
   <ItemGroup>
@@ -72,6 +74,13 @@
     <TrimmerRootAssembly Include="PresentationFramework" />
     <TrimmerRootAssembly Include="WindowsBase" />
     <TrimmerRootAssembly Include="System.Xaml" />
+  </ItemGroup>
+  
+  <!-- Linker substitutions -->
+  <ItemGroup>
+    <EmbeddedResource Include="ILLink.Substitutions.xml">
+      <LogicalName>ILLink.Substitutions.xml</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 
 </Project>
