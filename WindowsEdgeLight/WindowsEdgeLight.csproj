@@ -10,9 +10,9 @@
     <ApplicationIcon>ringlight_cropped.ico</ApplicationIcon>
     
     <!-- Assembly Information -->
-    <AssemblyVersion>1.7.0.0</AssemblyVersion>
-    <FileVersion>1.7.0.0</FileVersion>
-    <Version>1.7</Version>
+    <AssemblyVersion>1.8.0.0</AssemblyVersion>
+    <FileVersion>1.8.0.0</FileVersion>
+    <Version>1.8</Version>
     <Authors>Scott Hanselman</Authors>
     <Company>Scott Hanselman</Company>
     <Product>Windows Edge Light</Product>
