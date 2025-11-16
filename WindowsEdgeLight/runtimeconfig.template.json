@@ -1,0 +1,13 @@
+{
+  "configProperties": {
+    "System.GC.Server": false,
+    "System.GC.Concurrent": true,
+    "System.GC.RetainVM": false,
+    "System.GC.HeapCount": 1,
+    "System.Runtime.Serialization.EnableUnsafeBinaryFormatterSerialization": false,
+    "System.StartupHookProvider.IsSupported": false,
+    "System.Text.Encoding.EnableUnsafeUTF7Encoding": false,
+    "System.Threading.ThreadPool.MinThreads": 1,
+    "System.Threading.ThreadPool.MaxThreads": 32
+  }
+}

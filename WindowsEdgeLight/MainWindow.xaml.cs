@@ -3,8 +3,9 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
-using System.Windows.Forms;
 using System.IO;
+// Windows Forms only used for NotifyIcon (taskbar icon)
+using WinForms = System.Windows.Forms;
 
 namespace WindowsEdgeLight;
 
@@ -16,12 +17,12 @@ public partial class MainWindow : Window
     private const double MinOpacity = 0.2;
     private const double MaxOpacity = 1.0;
     
-    private NotifyIcon? notifyIcon;
+    private WinForms.NotifyIcon? notifyIcon;
     private ControlWindow? controlWindow;
 
     // Monitor management
     private int currentMonitorIndex = 0;
-    private Screen[] availableMonitors = Array.Empty<Screen>();
+    private MonitorInfo.Monitor[] availableMonitors = Array.Empty<MonitorInfo.Monitor>();
 
     // Global hotkey IDs
     private const int HOTKEY_TOGGLE = 1;
@@ -53,7 +54,7 @@ public partial class MainWindow : Window
 
     private void SetupNotifyIcon()
     {
-        notifyIcon = new NotifyIcon();
+        notifyIcon = new WinForms.NotifyIcon();
         
         // Load icon from embedded resource or file
         try
@@ -79,13 +80,13 @@ public partial class MainWindow : Window
         notifyIcon.Text = "Windows Edge Light - Right-click for options";
         notifyIcon.Visible = true;
         
-        var contextMenu = new ContextMenuStrip();
+        var contextMenu = new WinForms.ContextMenuStrip();
         contextMenu.Items.Add("📋 Keyboard Shortcuts", null, (s, e) => ShowHelp());
-        contextMenu.Items.Add(new ToolStripSeparator());
+        contextMenu.Items.Add(new WinForms.ToolStripSeparator());
         contextMenu.Items.Add("💡 Toggle Light (Ctrl+Shift+L)", null, (s, e) => ToggleLight());
         contextMenu.Items.Add("🔆 Brightness Up (Ctrl+Shift+↑)", null, (s, e) => IncreaseBrightness());
         contextMenu.Items.Add("🔅 Brightness Down (Ctrl+Shift+↓)", null, (s, e) => DecreaseBrightness());
-        contextMenu.Items.Add(new ToolStripSeparator());
+        contextMenu.Items.Add(new WinForms.ToolStripSeparator());
         contextMenu.Items.Add("✖ Exit", null, (s, e) => System.Windows.Application.Current.Shutdown());
         
         notifyIcon.ContextMenuStrip = contextMenu;
@@ -120,7 +121,7 @@ Version {version}";
         // Initialize available monitors on first setup
         if (availableMonitors.Length == 0)
         {
-            availableMonitors = Screen.AllScreens;
+            availableMonitors = MonitorInfo.AllMonitors;
             
             // Find the primary monitor index
             for (int i = 0; i < availableMonitors.Length; i++)
@@ -133,16 +134,16 @@ Version {version}";
             }
         }
 
-        var targetScreen = availableMonitors.Length > 0 ? availableMonitors[currentMonitorIndex] : Screen.PrimaryScreen;
+        var targetScreen = availableMonitors.Length > 0 ? availableMonitors[currentMonitorIndex] : MonitorInfo.PrimaryMonitor;
         if (targetScreen == null) return;
 
         SetupWindowForScreen(targetScreen);
     }
 
-    private void SetupWindowForScreen(Screen screen)
+    private void SetupWindowForScreen(MonitorInfo.Monitor monitor)
     {
         // Use WorkingArea instead of Bounds to exclude taskbar
-        var workingArea = screen.WorkingArea;
+        var workingArea = monitor.WorkingArea;
         
         // Get DPI scale factor
         var source = PresentationSource.FromVisual(this);
@@ -156,8 +157,8 @@ Version {version}";
         }
         
         // Convert physical pixels to WPF DIPs
-        this.Left = workingArea.X / dpiScaleX;
-        this.Top = workingArea.Y / dpiScaleY;
+        this.Left = workingArea.Left / dpiScaleX;
+        this.Top = workingArea.Top / dpiScaleY;
         this.Width = workingArea.Width / dpiScaleX;
         this.Height = workingArea.Height / dpiScaleY;
         this.WindowState = System.Windows.WindowState.Normal;
@@ -311,7 +312,7 @@ Version {version}";
     public void MoveToNextMonitor()
     {
         // Refresh monitor list in case of hot-plug/unplug
-        availableMonitors = Screen.AllScreens;
+        availableMonitors = MonitorInfo.AllMonitors;
 
         if (availableMonitors.Length <= 1)
         {
@@ -360,7 +361,7 @@ Version {version}";
     public bool HasMultipleMonitors()
     {
         // Refresh monitor count to handle hot-plug scenarios
-        availableMonitors = Screen.AllScreens;
+        availableMonitors = MonitorInfo.AllMonitors;
         return availableMonitors.Length > 1;
     }
 
@@ -391,17 +392,15 @@ Version {version}";
     private void UpdateCurrentMonitorIndex()
     {
         // Refresh monitor list
-        availableMonitors = Screen.AllScreens;
+        availableMonitors = MonitorInfo.AllMonitors;
         
         // Figure out which monitor we're actually on now
-        var windowCenter = new System.Drawing.Point(
-            (int)(this.Left + this.Width / 2),
-            (int)(this.Top + this.Height / 2)
-        );
+        int windowCenterX = (int)(this.Left + this.Width / 2);
+        int windowCenterY = (int)(this.Top + this.Height / 2);
         
         for (int i = 0; i < availableMonitors.Length; i++)
         {
-            if (availableMonitors[i].Bounds.Contains(windowCenter))
+            if (availableMonitors[i].Bounds.ContainsPoint(windowCenterX, windowCenterY))
             {
                 currentMonitorIndex = i;
                 break;

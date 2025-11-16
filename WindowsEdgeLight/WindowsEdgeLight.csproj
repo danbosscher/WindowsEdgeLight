@@ -46,6 +46,15 @@
     <!-- Optimize IL -->
     <IlcOptimizationPreference>Speed</IlcOptimizationPreference>
     <IlcGenerateStackTraceData>false</IlcGenerateStackTraceData>
+    
+    <!-- Additional runtime optimizations -->
+    <UseSystemResourceKeys>true</UseSystemResourceKeys>
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+    <EnableUnsafeBinaryFormatterSerialization>false</EnableUnsafeBinaryFormatterSerialization>
+    <EnableUnsafeUTF7Encoding>false</EnableUnsafeUTF7Encoding>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
+    <RetainVMGarbageCollection>false</RetainVMGarbageCollection>
   </PropertyGroup>
   <ItemGroup>
     <Content Include="ringlight_cropped.ico">
