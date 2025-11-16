@@ -70,7 +70,7 @@ dotnet publish -c Release /p:DebugType=None /p:DebugSymbols=false
 
 The executable will be in `bin\Release\net10.0-windows\win-x64\publish\WindowsEdgeLight.exe`
 
-**Note**: WPF applications cannot use AOT compilation or aggressive trimming. The single-file executable is self-contained and compressed (~72MB) but includes the full .NET runtime.
+**Note**: The single-file executable is self-contained, trimmed, and compressed. It includes an optimized .NET runtime with partial trimming, ReadyToRun compilation, and reduced globalization support for minimal size.
 
 ## Usage
 
