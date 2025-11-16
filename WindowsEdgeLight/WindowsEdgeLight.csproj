@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -19,20 +19,68 @@
     <Description>A lightweight WPF application that adds a customizable glowing edge light effect around your primary monitor</Description>
     <Copyright>Copyright © 2025 Scott Hanselman</Copyright>
     
-    <!-- Publishing Options - Single-file self-contained (no trimming for WPF/WinForms compatibility) -->
+    <!-- Publishing Options - Single-file self-contained with optimizations -->
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    
+    <!-- Trimming and optimization settings -->
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>partial</TrimMode>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <SuppressTrimAnalysisWarnings>false</SuppressTrimAnalysisWarnings>
+    
+    <!-- ReadyToRun for faster startup and better memory usage -->
+    <PublishReadyToRun>true</PublishReadyToRun>
+    
+    <!-- Globalization optimizations -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+    
+    <!-- Reduce runtime overhead -->
+    <EventSourceSupport>false</EventSourceSupport>
+    <HttpActivityPropagationSupport>false</HttpActivityPropagationSupport>
+    <MetadataUpdaterSupport>false</MetadataUpdaterSupport>
+    
+    <!-- Optimize IL -->
+    <IlcOptimizationPreference>Speed</IlcOptimizationPreference>
+    <IlcGenerateStackTraceData>false</IlcGenerateStackTraceData>
+    
+    <!-- Additional runtime optimizations -->
+    <UseSystemResourceKeys>true</UseSystemResourceKeys>
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+    <EnableUnsafeBinaryFormatterSerialization>false</EnableUnsafeBinaryFormatterSerialization>
+    <EnableUnsafeUTF7Encoding>false</EnableUnsafeUTF7Encoding>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
+    <RetainVMGarbageCollection>false</RetainVMGarbageCollection>
   </PropertyGroup>
-  <ItemGroup>
+  
+  <ItemGroup>
     <Content Include="ringlight_cropped.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Updatum" Version="1.1.6" />
-  </ItemGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="Updatum" Version="1.1.6" />
+  </ItemGroup>
+  
+  <!-- Trimming configuration for WPF -->
+  <ItemGroup>
+    <TrimmerRootAssembly Include="WindowsEdgeLight" />
+    <TrimmerRootAssembly Include="PresentationCore" />
+    <TrimmerRootAssembly Include="PresentationFramework" />
+    <TrimmerRootAssembly Include="WindowsBase" />
+    <TrimmerRootAssembly Include="System.Xaml" />
+  </ItemGroup>
+  
+  <!-- Linker substitutions -->
+  <ItemGroup>
+    <EmbeddedResource Include="ILLink.Substitutions.xml">
+      <LogicalName>ILLink.Substitutions.xml</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
 
 </Project>
