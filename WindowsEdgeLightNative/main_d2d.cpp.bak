@@ -1,0 +1,549 @@
+#ifndef UNICODE
+#define UNICODE
+#endif
+
+#include <windows.h>
+#include <d2d1.h>
+#include <d2d1helper.h>
+#include <shellapi.h>
+#include <dwmapi.h>
+#include <cmath>
+
+#pragma comment(lib, "d2d1")
+#pragma comment(lib, "dwmapi")
+
+#include "resource.h"
+
+template<class Interface>
+inline void SafeRelease(Interface** ppInterfaceToRelease)
+{
+    if (*ppInterfaceToRelease != nullptr)
+    {
+        (*ppInterfaceToRelease)->Release();
+        (*ppInterfaceToRelease) = nullptr;
+    }
+}
+
+class EdgeLightWindow
+{
+private:
+    HWND hwnd;
+    ID2D1Factory* pD2DFactory;
+    ID2D1HwndRenderTarget* pRenderTarget;
+    ID2D1SolidColorBrush* pBrush;
+    ID2D1PathGeometry* pFrameGeometry;
+    
+    NOTIFYICONDATA nid;
+    bool isLightOn;
+    float currentOpacity;
+    int currentMonitorIndex;
+    HMONITOR monitors[8];
+    int monitorCount;
+    
+    static constexpr float OPACITY_STEP = 0.15f;
+    static constexpr float MIN_OPACITY = 0.2f;
+    static constexpr float MAX_OPACITY = 1.0f;
+    static constexpr float FRAME_THICKNESS = 80.0f;
+    static constexpr float OUTER_RADIUS = 100.0f;
+    static constexpr float INNER_RADIUS = 60.0f;
+    static constexpr int HOTKEY_TOGGLE = 1;
+    static constexpr int HOTKEY_BRIGHTNESS_UP = 2;
+    static constexpr int HOTKEY_BRIGHTNESS_DOWN = 3;
+
+public:
+    EdgeLightWindow() : 
+        hwnd(nullptr), 
+        pD2DFactory(nullptr),
+        pRenderTarget(nullptr),
+        pBrush(nullptr),
+        pFrameGeometry(nullptr),
+        isLightOn(true),
+        currentOpacity(1.0f),
+        currentMonitorIndex(0),
+        monitorCount(0)
+    {
+        ZeroMemory(&nid, sizeof(nid));
+    }
+
+    ~EdgeLightWindow()
+    {
+        Shell_NotifyIcon(NIM_DELETE, &nid);
+        DiscardDeviceResources();
+        SafeRelease(&pD2DFactory);
+    }
+
+    HRESULT Initialize()
+    {
+        HRESULT hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &pD2DFactory);
+        if (SUCCEEDED(hr))
+        {
+            EnumerateMonitors();
+            hr = CreateOverlayWindow();
+        }
+        if (SUCCEEDED(hr))
+        {
+            SetupTrayIcon();
+            RegisterHotKeys();
+        }
+        return hr;
+    }
+
+    void RunMessageLoop()
+    {
+        MSG msg;
+        while (GetMessage(&msg, nullptr, 0, 0))
+        {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+    }
+
+private:
+    static BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC, LPRECT, LPARAM dwData)
+    {
+        auto* pThis = reinterpret_cast<EdgeLightWindow*>(dwData);
+        if (pThis->monitorCount < 8)
+        {
+            pThis->monitors[pThis->monitorCount++] = hMonitor;
+        }
+        return TRUE;
+    }
+
+    void EnumerateMonitors()
+    {
+        monitorCount = 0;
+        EnumDisplayMonitors(nullptr, nullptr, MonitorEnumProc, reinterpret_cast<LPARAM>(this));
+        
+        // Find primary monitor
+        POINT pt = {0, 0};
+        HMONITOR primaryMonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTOPRIMARY);
+        for (int i = 0; i < monitorCount; i++)
+        {
+            if (monitors[i] == primaryMonitor)
+            {
+                currentMonitorIndex = i;
+                break;
+            }
+        }
+    }
+
+    HRESULT CreateOverlayWindow()
+    {
+        WNDCLASSEX wcex = { sizeof(WNDCLASSEX) };
+        wcex.style = CS_HREDRAW | CS_VREDRAW;
+        wcex.lpfnWndProc = EdgeLightWindow::WndProc;
+        wcex.hInstance = GetModuleHandle(nullptr);
+        wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
+        wcex.lpszClassName = L"EdgeLightWindowClass";
+        wcex.hIcon = LoadIcon(GetModuleHandle(nullptr), MAKEINTRESOURCE(IDI_APPICON));
+        wcex.hIconSm = LoadIcon(GetModuleHandle(nullptr), MAKEINTRESOURCE(IDI_APPICON));
+
+        RegisterClassEx(&wcex);
+
+        MONITORINFO mi = { sizeof(mi) };
+        GetMonitorInfo(monitors[currentMonitorIndex], &mi);
+        RECT workArea = mi.rcWork;
+
+        hwnd = CreateWindowEx(
+            WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
+            L"EdgeLightWindowClass",
+            L"Windows Edge Light",
+            WS_POPUP,
+            workArea.left, workArea.top,
+            workArea.right - workArea.left,
+            workArea.bottom - workArea.top,
+            nullptr,
+            nullptr,
+            GetModuleHandle(nullptr),
+            this
+        );
+
+        if (!hwnd)
+        {
+            return E_FAIL;
+        }
+
+        // Set black as transparent color key
+        SetLayeredWindowAttributes(hwnd, RGB(0, 0, 0), 0, LWA_COLORKEY);
+
+        ShowWindow(hwnd, SW_SHOW);
+        UpdateWindow(hwnd);
+
+        return S_OK;
+    }
+
+
+
+    void SetupTrayIcon()
+    {
+        nid.cbSize = sizeof(NOTIFYICONDATA);
+        nid.hWnd = hwnd;
+        nid.uID = 1;
+        nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+        nid.uCallbackMessage = WM_USER + 1;
+        nid.hIcon = LoadIcon(GetModuleHandle(nullptr), MAKEINTRESOURCE(IDI_TRAYICON));
+        wcscpy_s(nid.szTip, L"Windows Edge Light - Right-click for options");
+        
+        Shell_NotifyIcon(NIM_ADD, &nid);
+    }
+
+    void RegisterHotKeys()
+    {
+        RegisterHotKey(hwnd, HOTKEY_TOGGLE, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, 'L');
+        RegisterHotKey(hwnd, HOTKEY_BRIGHTNESS_UP, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, VK_UP);
+        RegisterHotKey(hwnd, HOTKEY_BRIGHTNESS_DOWN, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, VK_DOWN);
+    }
+
+    HRESULT CreateDeviceResources()
+    {
+        HRESULT hr = S_OK;
+
+        if (!pRenderTarget)
+        {
+            RECT rc;
+            GetClientRect(hwnd, &rc);
+
+            D2D1_SIZE_U size = D2D1::SizeU(rc.right - rc.left, rc.bottom - rc.top);
+
+            D2D1_RENDER_TARGET_PROPERTIES props = D2D1::RenderTargetProperties();
+            props.pixelFormat = D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED);
+            props.usage = D2D1_RENDER_TARGET_USAGE_NONE;
+
+            D2D1_HWND_RENDER_TARGET_PROPERTIES hwndProps = D2D1::HwndRenderTargetProperties(hwnd, size);
+            hwndProps.presentOptions = D2D1_PRESENT_OPTIONS_IMMEDIATELY | D2D1_PRESENT_OPTIONS_RETAIN_CONTENTS;
+
+            hr = pD2DFactory->CreateHwndRenderTarget(
+                props,
+                hwndProps,
+                &pRenderTarget
+            );
+
+            if (SUCCEEDED(hr))
+            {
+                hr = pRenderTarget->CreateSolidColorBrush(
+                    D2D1::ColorF(D2D1::ColorF::White),
+                    &pBrush
+                );
+            }
+
+            if (SUCCEEDED(hr))
+            {
+                hr = CreateFrameGeometry();
+            }
+        }
+
+        return hr;
+    }
+
+    HRESULT CreateFrameGeometry()
+    {
+        SafeRelease(&pFrameGeometry);
+
+        RECT rc;
+        GetClientRect(hwnd, &rc);
+        float width = static_cast<float>(rc.right - rc.left - 40);
+        float height = static_cast<float>(rc.bottom - rc.top - 40);
+
+        ID2D1RectangleGeometry* pOuterRect = nullptr;
+        ID2D1RectangleGeometry* pInnerRect = nullptr;
+        ID2D1RoundedRectangleGeometry* pOuterRounded = nullptr;
+        ID2D1RoundedRectangleGeometry* pInnerRounded = nullptr;
+        ID2D1PathGeometry* pPathGeometry = nullptr;
+        ID2D1GeometrySink* pSink = nullptr;
+
+        HRESULT hr = pD2DFactory->CreateRoundedRectangleGeometry(
+            D2D1::RoundedRect(D2D1::RectF(20, 20, width + 20, height + 20), OUTER_RADIUS, OUTER_RADIUS),
+            &pOuterRounded
+        );
+
+        if (SUCCEEDED(hr))
+        {
+            hr = pD2DFactory->CreateRoundedRectangleGeometry(
+                D2D1::RoundedRect(
+                    D2D1::RectF(20 + FRAME_THICKNESS, 20 + FRAME_THICKNESS,
+                                width + 20 - FRAME_THICKNESS, height + 20 - FRAME_THICKNESS),
+                    INNER_RADIUS, INNER_RADIUS),
+                &pInnerRounded
+            );
+        }
+
+        if (SUCCEEDED(hr))
+        {
+            hr = pD2DFactory->CreatePathGeometry(&pFrameGeometry);
+        }
+
+        if (SUCCEEDED(hr))
+        {
+            hr = pFrameGeometry->Open(&pSink);
+        }
+
+        if (SUCCEEDED(hr))
+        {
+            pOuterRounded->CombineWithGeometry(
+                pInnerRounded,
+                D2D1_COMBINE_MODE_EXCLUDE,
+                nullptr,
+                pSink
+            );
+            hr = pSink->Close();
+        }
+
+        SafeRelease(&pOuterRounded);
+        SafeRelease(&pInnerRounded);
+        SafeRelease(&pSink);
+
+        return hr;
+    }
+
+    void DiscardDeviceResources()
+    {
+        SafeRelease(&pRenderTarget);
+        SafeRelease(&pBrush);
+        SafeRelease(&pFrameGeometry);
+    }
+
+    HRESULT OnRender()
+    {
+        HRESULT hr = CreateDeviceResources();
+
+        if (SUCCEEDED(hr) && pRenderTarget)
+        {
+            pRenderTarget->BeginDraw();
+            pRenderTarget->Clear(D2D1::ColorF(D2D1::ColorF::Black, 0.0f));
+
+            if (isLightOn && pFrameGeometry)
+            {
+                pBrush->SetOpacity(currentOpacity);
+                pRenderTarget->FillGeometry(pFrameGeometry, pBrush);
+            }
+
+            hr = pRenderTarget->EndDraw();
+
+            if (hr == D2DERR_RECREATE_TARGET)
+            {
+                hr = S_OK;
+                DiscardDeviceResources();
+            }
+        }
+
+        return hr;
+    }
+
+    void OnResize(UINT width, UINT height)
+    {
+        if (pRenderTarget)
+        {
+            pRenderTarget->Resize(D2D1::SizeU(width, height));
+            CreateFrameGeometry();
+        }
+    }
+
+    void ToggleLight()
+    {
+        isLightOn = !isLightOn;
+        if (!isLightOn)
+        {
+            DiscardDeviceResources();
+        }
+        InvalidateRect(hwnd, nullptr, FALSE);
+    }
+
+    void IncreaseBrightness()
+    {
+        currentOpacity = min(MAX_OPACITY, currentOpacity + OPACITY_STEP);
+        InvalidateRect(hwnd, nullptr, FALSE);
+    }
+
+    void DecreaseBrightness()
+    {
+        currentOpacity = max(MIN_OPACITY, currentOpacity - OPACITY_STEP);
+        InvalidateRect(hwnd, nullptr, FALSE);
+    }
+
+    void SwitchMonitor()
+    {
+        if (monitorCount <= 1) return;
+
+        currentMonitorIndex = (currentMonitorIndex + 1) % monitorCount;
+        
+        MONITORINFO mi = { sizeof(mi) };
+        GetMonitorInfo(monitors[currentMonitorIndex], &mi);
+        RECT workArea = mi.rcWork;
+
+        SetWindowPos(hwnd, HWND_TOPMOST,
+            workArea.left, workArea.top,
+            workArea.right - workArea.left,
+            workArea.bottom - workArea.top,
+            SWP_SHOWWINDOW);
+
+        DiscardDeviceResources();
+        InvalidateRect(hwnd, nullptr, FALSE);
+    }
+
+    void ShowTrayMenu()
+    {
+        POINT pt;
+        GetCursorPos(&pt);
+
+        HMENU hMenu = CreatePopupMenu();
+        AppendMenu(hMenu, MF_STRING, IDM_HELP, L"Keyboard Shortcuts");
+        AppendMenu(hMenu, MF_SEPARATOR, 0, nullptr);
+        AppendMenu(hMenu, MF_STRING, IDM_TOGGLE, L"Toggle Light (Ctrl+Shift+L)");
+        AppendMenu(hMenu, MF_STRING, IDM_BRIGHTNESS_UP, L"Brightness Up (Ctrl+Shift+\x2191)");
+        AppendMenu(hMenu, MF_STRING, IDM_BRIGHTNESS_DOWN, L"Brightness Down (Ctrl+Shift+\x2193)");
+        
+        if (monitorCount > 1)
+        {
+            AppendMenu(hMenu, MF_STRING, IDM_SWITCH_MONITOR, L"Switch Monitor");
+        }
+        
+        AppendMenu(hMenu, MF_SEPARATOR, 0, nullptr);
+        AppendMenu(hMenu, MF_STRING, IDM_EXIT, L"Exit");
+
+        SetForegroundWindow(hwnd);
+        TrackPopupMenu(hMenu, TPM_BOTTOMALIGN | TPM_LEFTALIGN, pt.x, pt.y, 0, hwnd, nullptr);
+        DestroyMenu(hMenu);
+    }
+
+    void ShowHelp()
+    {
+        MessageBox(hwnd,
+            L"Windows Edge Light - Keyboard Shortcuts\n\n"
+            L"Toggle Light:  Ctrl + Shift + L\n"
+            L"Brightness Up:  Ctrl + Shift + \x2191\n"
+            L"Brightness Down:  Ctrl + Shift + \x2193\n\n"
+            L"Features:\n"
+            L"\x2022 Click-through overlay - won't interfere with your work\n"
+            L"\x2022 Global hotkeys work from any application\n"
+            L"\x2022 Right-click taskbar icon for menu\n\n"
+            L"Created by Scott Hanselman\n"
+            L"Version 2.0 - Native Edition",
+            L"Windows Edge Light - Help",
+            MB_OK | MB_ICONINFORMATION);
+    }
+
+    static LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+    {
+        EdgeLightWindow* pThis = nullptr;
+
+        if (message == WM_NCCREATE)
+        {
+            CREATESTRUCT* pCreate = reinterpret_cast<CREATESTRUCT*>(lParam);
+            pThis = reinterpret_cast<EdgeLightWindow*>(pCreate->lpCreateParams);
+            SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pThis));
+        }
+        else
+        {
+            pThis = reinterpret_cast<EdgeLightWindow*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+        }
+
+        if (pThis)
+        {
+            switch (message)
+            {
+            case WM_PAINT:
+            {
+                pThis->OnRender();
+                ValidateRect(hwnd, nullptr);
+                return 0;
+            }
+
+            case WM_SIZE:
+            {
+                UINT width = LOWORD(lParam);
+                UINT height = HIWORD(lParam);
+                pThis->OnResize(width, height);
+                return 0;
+            }
+
+            case WM_HOTKEY:
+            {
+                switch (wParam)
+                {
+                case HOTKEY_TOGGLE:
+                    pThis->ToggleLight();
+                    break;
+                case HOTKEY_BRIGHTNESS_UP:
+                    pThis->IncreaseBrightness();
+                    break;
+                case HOTKEY_BRIGHTNESS_DOWN:
+                    pThis->DecreaseBrightness();
+                    break;
+                }
+                return 0;
+            }
+
+            case WM_USER + 1: // Tray icon message
+            {
+                if (lParam == WM_RBUTTONUP)
+                {
+                    pThis->ShowTrayMenu();
+                }
+                else if (lParam == WM_LBUTTONDBLCLK)
+                {
+                    pThis->ShowHelp();
+                }
+                return 0;
+            }
+
+            case WM_COMMAND:
+            {
+                switch (LOWORD(wParam))
+                {
+                case IDM_EXIT:
+                    PostQuitMessage(0);
+                    return 0;
+                case IDM_TOGGLE:
+                    pThis->ToggleLight();
+                    return 0;
+                case IDM_BRIGHTNESS_UP:
+                    pThis->IncreaseBrightness();
+                    return 0;
+                case IDM_BRIGHTNESS_DOWN:
+                    pThis->DecreaseBrightness();
+                    return 0;
+                case IDM_SWITCH_MONITOR:
+                    pThis->SwitchMonitor();
+                    return 0;
+                case IDM_HELP:
+                    pThis->ShowHelp();
+                    return 0;
+                }
+                break;
+            }
+
+            case WM_DESTROY:
+            {
+                UnregisterHotKey(hwnd, HOTKEY_TOGGLE);
+                UnregisterHotKey(hwnd, HOTKEY_BRIGHTNESS_UP);
+                UnregisterHotKey(hwnd, HOTKEY_BRIGHTNESS_DOWN);
+                PostQuitMessage(0);
+                return 0;
+            }
+            }
+        }
+
+        return DefWindowProc(hwnd, message, wParam, lParam);
+    }
+
+
+};
+
+int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int)
+{
+    HeapSetInformation(nullptr, HeapEnableTerminationOnCorruption, nullptr, 0);
+
+    if (SUCCEEDED(CoInitialize(nullptr)))
+    {
+        {
+            EdgeLightWindow app;
+            if (SUCCEEDED(app.Initialize()))
+            {
+                app.RunMessageLoop();
+            }
+        }
+        CoUninitialize();
+    }
+
+    return 0;
+}

@@ -1,6 +1,19 @@
 # Windows Edge Light
 
-A lightweight WPF application that adds a customizable glowing edge light effect around your primary monitor on Windows. Perfect for ambient lighting during video calls, streaming, or just adding a professional touch to your workspace.
+A customizable glowing edge light effect around your primary monitor on Windows. Perfect for ambient lighting during video calls, streaming, or just adding a professional touch to your workspace.
+
+## 🚀 Two Versions Available
+
+| Version | Size | RAM | Technology | Best For |
+|---------|------|-----|------------|----------|
+| **[Native Edition](WindowsEdgeLightNative/)** | **123 KB** | **~10 MB** | C++ Win32/Direct2D | Users wanting minimal footprint |
+| [WPF Edition](WindowsEdgeLight/) | 72 MB | ~300 MB | .NET 10 + WPF | Users wanting auto-updates |
+
+> 💡 **New!** The Native Edition is **600x smaller** and uses **97% less memory** while maintaining full feature parity. See [NATIVE_VERSION.md](NATIVE_VERSION.md) for details.
+
+---
+
+## WPF Edition
 
 ## Features
 
