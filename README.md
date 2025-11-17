@@ -7,16 +7,20 @@ A lightweight native Windows application that displays a glowing frame around yo
 ## Features
 
 - Click-through transparent overlay
+- **Control panel with visual sliders** (toggleable)
+- **Adjustable frame thickness** (20-150px via slider)
+- **Blur/glow effect** around the frame
 - Adjustable brightness levels
 - System tray integration with context menu
 - Global keyboard shortcuts
 - Multi-monitor support
 - Rounded corner frame design
-- Minimal resource usage (~2MB RAM)
+- Minimal resource usage (~4MB RAM)
 
 ## Keyboard Shortcuts
 
 - **Ctrl + Shift + L** - Toggle light on/off
+- **Ctrl + Shift + C** - Toggle control panel
 - **Ctrl + Shift + ↑** - Increase brightness
 - **Ctrl + Shift + ↓** - Decrease brightness
 
@@ -65,10 +69,10 @@ The application uses Win32 APIs and GDI for rendering:
 - Direct window HDC rendering (no backbuffers)
 
 ### Performance Characteristics
-- Executable size: ~106 KB
-- Private memory usage: ~2 MB
+- Executable size: ~109 KB
+- Private memory usage: ~4 MB
 - No runtime dependencies
-- Startup time: <50ms
+- Startup time: <80ms
 - Idle CPU usage: 0%
 
 ## Architecture
