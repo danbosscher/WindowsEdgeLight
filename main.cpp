@@ -307,25 +307,25 @@ private:
             HRGN frameRegion = CreateRectRgn(0, 0, 0, 0);
             CombineRgn(frameRegion, outerRegion, innerRegion, RGN_DIFF);
             
-            // Draw blur/glow layers first (from outside to inside for proper alpha blending)
+            // Draw blur/glow layers on both inner and outer edges
             int intensity = (255 * currentOpacity) / 255;
+            int blurSize = 5; // Smaller blur radius
             
-            for (int i = BLUR_SIZE; i >= 1; i -= 2)
+            // Outer blur (outside the frame)
+            for (int i = blurSize; i >= 1; i--)
             {
                 int offset = i;
-                // Blur should fade out as it goes outward
-                int blurIntensity = (intensity * (BLUR_SIZE - i + 1)) / (BLUR_SIZE + 4);
+                int blurIntensity = (intensity * (blurSize - i + 1)) / (blurSize + 3);
                 
-                // Create blur ring just outside the main frame
                 HRGN blurOuter = CreateRoundRectRgn(
                     20 - offset, 20 - offset,
                     rc.right - 20 + offset, rc.bottom - 20 + offset,
                     (CORNER_RADIUS + offset) * 2, (CORNER_RADIUS + offset) * 2);
                     
                 HRGN blurInner = CreateRoundRectRgn(
-                    20 - offset + 2, 20 - offset + 2,
-                    rc.right - 20 + offset - 2, rc.bottom - 20 + offset - 2,
-                    (CORNER_RADIUS + offset - 2) * 2, (CORNER_RADIUS + offset - 2) * 2);
+                    20 - offset + 1, 20 - offset + 1,
+                    rc.right - 20 + offset - 1, rc.bottom - 20 + offset - 1,
+                    (CORNER_RADIUS + offset - 1) * 2, (CORNER_RADIUS + offset - 1) * 2);
                 
                 HRGN blurRegion = CreateRectRgn(0, 0, 0, 0);
                 CombineRgn(blurRegion, blurOuter, blurInner, RGN_DIFF);
@@ -339,9 +339,41 @@ private:
                 DeleteObject(blurOuter);
             }
             
-            // Draw main frame on top
+            // Draw main frame
             HBRUSH mainBrush = CreateSolidBrush(RGB(intensity, intensity, intensity));
             FillRgn(hdc, frameRegion, mainBrush);
+            
+            // Inner blur (inside the frame)
+            for (int i = 1; i <= blurSize; i++)
+            {
+                int offset = i;
+                int blurIntensity = (intensity * (blurSize - i + 1)) / (blurSize + 3);
+                
+                int innerEdge = 20 + frameThickness;
+                int adjustedInnerRadius = innerRadius - offset;
+                if (adjustedInnerRadius < 10) adjustedInnerRadius = 10;
+                
+                HRGN blurOuter = CreateRoundRectRgn(
+                    innerEdge - offset, innerEdge - offset,
+                    rc.right - innerEdge + offset, rc.bottom - innerEdge + offset,
+                    (adjustedInnerRadius + offset) * 2, (adjustedInnerRadius + offset) * 2);
+                    
+                HRGN blurInner = CreateRoundRectRgn(
+                    innerEdge - offset + 1, innerEdge - offset + 1,
+                    rc.right - innerEdge + offset - 1, rc.bottom - innerEdge + offset - 1,
+                    (adjustedInnerRadius + offset - 1) * 2, (adjustedInnerRadius + offset - 1) * 2);
+                
+                HRGN blurRegion = CreateRectRgn(0, 0, 0, 0);
+                CombineRgn(blurRegion, blurOuter, blurInner, RGN_DIFF);
+                
+                HBRUSH blurBrush = CreateSolidBrush(RGB(blurIntensity, blurIntensity, blurIntensity));
+                FillRgn(hdc, blurRegion, blurBrush);
+                
+                DeleteObject(blurBrush);
+                DeleteObject(blurRegion);
+                DeleteObject(blurInner);
+                DeleteObject(blurOuter);
+            }
             
             // Cleanup
             DeleteObject(mainBrush);
