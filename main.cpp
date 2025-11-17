@@ -307,25 +307,25 @@ private:
             HRGN frameRegion = CreateRectRgn(0, 0, 0, 0);
             CombineRgn(frameRegion, outerRegion, innerRegion, RGN_DIFF);
             
-            // Draw main frame
+            // Draw blur/glow layers first (from outside to inside for proper alpha blending)
             int intensity = (255 * currentOpacity) / 255;
-            HBRUSH mainBrush = CreateSolidBrush(RGB(intensity, intensity, intensity));
-            FillRgn(hdc, frameRegion, mainBrush);
             
-            // Draw blur/glow layers
-            for (int i = 1; i <= BLUR_SIZE; i += 2)
+            for (int i = BLUR_SIZE; i >= 1; i -= 2)
             {
                 int offset = i;
-                int blurIntensity = (intensity * (BLUR_SIZE - i)) / (BLUR_SIZE * 2);
+                // Blur should fade out as it goes outward
+                int blurIntensity = (intensity * (BLUR_SIZE - i + 1)) / (BLUR_SIZE + 4);
                 
+                // Create blur ring just outside the main frame
                 HRGN blurOuter = CreateRoundRectRgn(
                     20 - offset, 20 - offset,
                     rc.right - 20 + offset, rc.bottom - 20 + offset,
                     (CORNER_RADIUS + offset) * 2, (CORNER_RADIUS + offset) * 2);
                     
                 HRGN blurInner = CreateRoundRectRgn(
-                    20, 20, rc.right - 20, rc.bottom - 20,
-                    CORNER_RADIUS * 2, CORNER_RADIUS * 2);
+                    20 - offset + 2, 20 - offset + 2,
+                    rc.right - 20 + offset - 2, rc.bottom - 20 + offset - 2,
+                    (CORNER_RADIUS + offset - 2) * 2, (CORNER_RADIUS + offset - 2) * 2);
                 
                 HRGN blurRegion = CreateRectRgn(0, 0, 0, 0);
                 CombineRgn(blurRegion, blurOuter, blurInner, RGN_DIFF);
@@ -338,6 +338,10 @@ private:
                 DeleteObject(blurInner);
                 DeleteObject(blurOuter);
             }
+            
+            // Draw main frame on top
+            HBRUSH mainBrush = CreateSolidBrush(RGB(intensity, intensity, intensity));
+            FillRgn(hdc, frameRegion, mainBrush);
             
             // Cleanup
             DeleteObject(mainBrush);
