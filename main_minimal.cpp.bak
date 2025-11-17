@@ -3,71 +3,42 @@
 #endif
 
 #include <windows.h>
-#include <windowsx.h>
 #include <shellapi.h>
 #include <dwmapi.h>
-#include <commctrl.h>
 
 #pragma comment(lib, "dwmapi")
 #pragma comment(lib, "gdi32")
 #pragma comment(lib, "msimg32")
-#pragma comment(lib, "comctl32")
 
 #include "resource.h"
-
-// Menu IDs
-#define IDM_EXIT 103
-#define IDM_TOGGLE 104
-#define IDM_BRIGHTNESS_UP 105
-#define IDM_BRIGHTNESS_DOWN 106
-#define IDM_SWITCH_MONITOR 107
-#define IDM_HELP 108
-#define IDM_TOGGLE_CONTROLS 109
-
-// Control IDs
-#define IDC_THICKNESS_SLIDER 1001
-#define IDC_BRIGHTNESS_SLIDER 1002
-#define IDC_TOGGLE_BTN 1003
-#define IDC_MONITOR_BTN 1004
-#define IDC_CLOSE_BTN 1005
 
 class EdgeLightWindow
 {
 private:
     HWND hwnd;
-    HWND controlHwnd;
     NOTIFYICONDATA nid;
     bool isLightOn;
     int currentOpacity;
     int currentMonitorIndex;
-    int frameThickness;
     HMONITOR monitors[8];
     int monitorCount;
-    bool controlsVisible;
     
     static constexpr int OPACITY_STEP = 38;
     static constexpr int MIN_OPACITY = 51;
     static constexpr int MAX_OPACITY = 255;
-    static constexpr int MIN_THICKNESS = 20;
-    static constexpr int MAX_THICKNESS = 150;
-    static constexpr int DEFAULT_THICKNESS = 80;
+    static constexpr int FRAME_THICKNESS = 80;
     static constexpr int CORNER_RADIUS = 100;
-    static constexpr int BLUR_SIZE = 10;
     static constexpr int HOTKEY_TOGGLE = 1;
     static constexpr int HOTKEY_BRIGHTNESS_UP = 2;
     static constexpr int HOTKEY_BRIGHTNESS_DOWN = 3;
-    static constexpr int HOTKEY_TOGGLE_CONTROLS = 4;
 
 public:
     EdgeLightWindow() : 
         hwnd(nullptr),
-        controlHwnd(nullptr),
         isLightOn(true),
         currentOpacity(255),
         currentMonitorIndex(0),
-        monitorCount(0),
-        frameThickness(DEFAULT_THICKNESS),
-        controlsVisible(true)
+        monitorCount(0)
     {
         ZeroMemory(&nid, sizeof(nid));
         ZeroMemory(monitors, sizeof(monitors));
@@ -80,12 +51,10 @@ public:
 
     HRESULT Initialize()
     {
-        InitCommonControls();
         EnumerateMonitors();
         if (CreateOverlayWindow() != S_OK)
             return E_FAIL;
         
-        CreateControlWindow();
         SetupTrayIcon();
         RegisterHotKeys();
         return S_OK;
@@ -170,94 +139,6 @@ private:
         return S_OK;
     }
 
-    HRESULT CreateControlWindow()
-    {
-        WNDCLASSEX wcex = { sizeof(WNDCLASSEX) };
-        wcex.style = CS_HREDRAW | CS_VREDRAW;
-        wcex.lpfnWndProc = EdgeLightWindow::ControlWndProc;
-        wcex.hInstance = GetModuleHandle(nullptr);
-        wcex.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
-        wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
-        wcex.lpszClassName = L"EdgeLightControlClass";
-
-        RegisterClassEx(&wcex);
-
-        MONITORINFO mi = { sizeof(mi) };
-        GetMonitorInfo(monitors[currentMonitorIndex], &mi);
-        RECT workArea = mi.rcWork;
-
-        int controlWidth = 320;
-        int controlHeight = 140;
-        int controlX = workArea.left + (workArea.right - workArea.left - controlWidth) / 2;
-        int controlY = workArea.bottom - controlHeight - 80;
-
-        controlHwnd = CreateWindowEx(
-            WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED,
-            L"EdgeLightControlClass",
-            L"Edge Light Controls",
-            WS_POPUP | WS_VISIBLE,
-            controlX, controlY,
-            controlWidth, controlHeight,
-            hwnd,
-            nullptr,
-            GetModuleHandle(nullptr),
-            this
-        );
-
-        if (!controlHwnd)
-            return E_FAIL;
-
-        SetLayeredWindowAttributes(controlHwnd, 0, 230, LWA_ALPHA);
-        
-        // Create controls
-        CreateControlWidgets();
-        
-        ShowWindow(controlHwnd, controlsVisible ? SW_SHOW : SW_HIDE);
-        return S_OK;
-    }
-
-    void CreateControlWidgets()
-    {
-        HINSTANCE hInst = GetModuleHandle(nullptr);
-        HWND hwndParent = controlHwnd;
-        
-        // Thickness slider
-        CreateWindow(L"STATIC", L"Frame Thickness:", WS_CHILD | WS_VISIBLE,
-            10, 10, 120, 20, hwndParent, nullptr, hInst, nullptr);
-        
-        HWND thicknessSlider = CreateWindow(TRACKBAR_CLASS, L"",
-            WS_CHILD | WS_VISIBLE | TBS_HORZ | TBS_AUTOTICKS,
-            130, 10, 150, 25, hwndParent, (HMENU)IDC_THICKNESS_SLIDER, hInst, nullptr);
-        
-        SendMessage(thicknessSlider, TBM_SETRANGE, TRUE, MAKELONG(MIN_THICKNESS, MAX_THICKNESS));
-        SendMessage(thicknessSlider, TBM_SETPOS, TRUE, frameThickness);
-        SendMessage(thicknessSlider, TBM_SETTICFREQ, 10, 0);
-        
-        // Brightness slider
-        CreateWindow(L"STATIC", L"Brightness:", WS_CHILD | WS_VISIBLE,
-            10, 45, 120, 20, hwndParent, nullptr, hInst, nullptr);
-        
-        HWND brightnessSlider = CreateWindow(TRACKBAR_CLASS, L"",
-            WS_CHILD | WS_VISIBLE | TBS_HORZ | TBS_AUTOTICKS,
-            130, 45, 150, 25, hwndParent, (HMENU)IDC_BRIGHTNESS_SLIDER, hInst, nullptr);
-        
-        SendMessage(brightnessSlider, TBM_SETRANGE, TRUE, MAKELONG(MIN_OPACITY, MAX_OPACITY));
-        SendMessage(brightnessSlider, TBM_SETPOS, TRUE, currentOpacity);
-        
-        // Buttons
-        CreateWindow(L"BUTTON", L"Toggle", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-            10, 85, 70, 30, hwndParent, (HMENU)IDC_TOGGLE_BTN, hInst, nullptr);
-        
-        if (monitorCount > 1)
-        {
-            CreateWindow(L"BUTTON", L"Monitor", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-                90, 85, 70, 30, hwndParent, (HMENU)IDC_MONITOR_BTN, hInst, nullptr);
-        }
-        
-        CreateWindow(L"BUTTON", L"Close", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-            monitorCount > 1 ? 170 : 90, 85, 70, 30, hwndParent, (HMENU)IDC_CLOSE_BTN, hInst, nullptr);
-    }
-
     void SetupTrayIcon()
     {
         nid.cbSize = sizeof(NOTIFYICONDATA);
@@ -276,7 +157,6 @@ private:
         RegisterHotKey(hwnd, HOTKEY_TOGGLE, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, 'L');
         RegisterHotKey(hwnd, HOTKEY_BRIGHTNESS_UP, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, VK_UP);
         RegisterHotKey(hwnd, HOTKEY_BRIGHTNESS_DOWN, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, VK_DOWN);
-        RegisterHotKey(hwnd, HOTKEY_TOGGLE_CONTROLS, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, 'C');
     }
 
     void OnPaint()
@@ -287,60 +167,31 @@ private:
         RECT rc;
         GetClientRect(hwnd, &rc);
         
-        // Fill with black (transparent color key)
+        // Always fill background with black (our transparent color key)
         HBRUSH blackBrush = (HBRUSH)GetStockObject(BLACK_BRUSH);
         FillRect(hdc, &rc, blackBrush);
         
         if (isLightOn)
         {
-            int innerRadius = CORNER_RADIUS - frameThickness;
-            if (innerRadius < 10) innerRadius = 10;
-            
-            // Create main frame region
+            // Create region for frame (outer - inner)
             HRGN outerRegion = CreateRoundRectRgn(20, 20, rc.right - 20, rc.bottom - 20, 
                                                    CORNER_RADIUS * 2, CORNER_RADIUS * 2);
-            HRGN innerRegion = CreateRoundRectRgn(20 + frameThickness, 20 + frameThickness,
-                                                   rc.right - 20 - frameThickness, 
-                                                   rc.bottom - 20 - frameThickness,
-                                                   innerRadius * 2, innerRadius * 2);
+            HRGN innerRegion = CreateRoundRectRgn(20 + FRAME_THICKNESS, 20 + FRAME_THICKNESS,
+                                                   rc.right - 20 - FRAME_THICKNESS, 
+                                                   rc.bottom - 20 - FRAME_THICKNESS,
+                                                   (CORNER_RADIUS - FRAME_THICKNESS) * 2, 
+                                                   (CORNER_RADIUS - FRAME_THICKNESS) * 2);
             
             HRGN frameRegion = CreateRectRgn(0, 0, 0, 0);
             CombineRgn(frameRegion, outerRegion, innerRegion, RGN_DIFF);
             
-            // Draw main frame
+            // Calculate color with opacity (simple linear blend)
             int intensity = (255 * currentOpacity) / 255;
-            HBRUSH mainBrush = CreateSolidBrush(RGB(intensity, intensity, intensity));
-            FillRgn(hdc, frameRegion, mainBrush);
-            
-            // Draw blur/glow layers
-            for (int i = 1; i <= BLUR_SIZE; i += 2)
-            {
-                int offset = i;
-                int blurIntensity = (intensity * (BLUR_SIZE - i)) / (BLUR_SIZE * 2);
-                
-                HRGN blurOuter = CreateRoundRectRgn(
-                    20 - offset, 20 - offset,
-                    rc.right - 20 + offset, rc.bottom - 20 + offset,
-                    (CORNER_RADIUS + offset) * 2, (CORNER_RADIUS + offset) * 2);
-                    
-                HRGN blurInner = CreateRoundRectRgn(
-                    20, 20, rc.right - 20, rc.bottom - 20,
-                    CORNER_RADIUS * 2, CORNER_RADIUS * 2);
-                
-                HRGN blurRegion = CreateRectRgn(0, 0, 0, 0);
-                CombineRgn(blurRegion, blurOuter, blurInner, RGN_DIFF);
-                
-                HBRUSH blurBrush = CreateSolidBrush(RGB(blurIntensity, blurIntensity, blurIntensity));
-                FillRgn(hdc, blurRegion, blurBrush);
-                
-                DeleteObject(blurBrush);
-                DeleteObject(blurRegion);
-                DeleteObject(blurInner);
-                DeleteObject(blurOuter);
-            }
+            HBRUSH whiteBrush = CreateSolidBrush(RGB(intensity, intensity, intensity));
+            FillRgn(hdc, frameRegion, whiteBrush);
             
             // Cleanup
-            DeleteObject(mainBrush);
+            DeleteObject(whiteBrush);
             DeleteObject(frameRegion);
             DeleteObject(innerRegion);
             DeleteObject(outerRegion);
@@ -361,7 +212,6 @@ private:
         {
             currentOpacity = min(MAX_OPACITY, currentOpacity + OPACITY_STEP);
             InvalidateRect(hwnd, nullptr, FALSE);
-            UpdateBrightnessSlider();
         }
     }
 
@@ -371,40 +221,6 @@ private:
         {
             currentOpacity = max(MIN_OPACITY, currentOpacity - OPACITY_STEP);
             InvalidateRect(hwnd, nullptr, FALSE);
-            UpdateBrightnessSlider();
-        }
-    }
-
-    void SetBrightness(int value)
-    {
-        currentOpacity = max(MIN_OPACITY, min(MAX_OPACITY, value));
-        InvalidateRect(hwnd, nullptr, FALSE);
-    }
-
-    void SetFrameThickness(int value)
-    {
-        frameThickness = max(MIN_THICKNESS, min(MAX_THICKNESS, value));
-        InvalidateRect(hwnd, nullptr, FALSE);
-    }
-
-    void UpdateBrightnessSlider()
-    {
-        if (controlHwnd)
-        {
-            HWND slider = GetDlgItem(controlHwnd, IDC_BRIGHTNESS_SLIDER);
-            if (slider)
-            {
-                SendMessage(slider, TBM_SETPOS, TRUE, currentOpacity);
-            }
-        }
-    }
-
-    void ToggleControls()
-    {
-        controlsVisible = !controlsVisible;
-        if (controlHwnd)
-        {
-            ShowWindow(controlHwnd, controlsVisible ? SW_SHOW : SW_HIDE);
         }
     }
 
@@ -425,25 +241,6 @@ private:
             SWP_SHOWWINDOW);
 
         InvalidateRect(hwnd, nullptr, FALSE);
-        RepositionControlWindow();
-    }
-
-    void RepositionControlWindow()
-    {
-        if (!controlHwnd) return;
-
-        RECT mainRect;
-        GetWindowRect(hwnd, &mainRect);
-        
-        RECT ctrlRect;
-        GetWindowRect(controlHwnd, &ctrlRect);
-        int controlWidth = ctrlRect.right - ctrlRect.left;
-        int controlHeight = ctrlRect.bottom - ctrlRect.top;
-        
-        int controlX = mainRect.left + (mainRect.right - mainRect.left - controlWidth) / 2;
-        int controlY = mainRect.bottom - controlHeight - 80;
-
-        SetWindowPos(controlHwnd, HWND_TOPMOST, controlX, controlY, 0, 0, SWP_NOSIZE | SWP_SHOWWINDOW);
     }
 
     void ShowTrayMenu()
@@ -455,7 +252,6 @@ private:
         AppendMenu(hMenu, MF_STRING, IDM_HELP, L"Keyboard Shortcuts");
         AppendMenu(hMenu, MF_SEPARATOR, 0, nullptr);
         AppendMenu(hMenu, MF_STRING, IDM_TOGGLE, L"Toggle Light (Ctrl+Shift+L)");
-        AppendMenu(hMenu, MF_STRING, IDM_TOGGLE_CONTROLS, L"Toggle Controls (Ctrl+Shift+C)");
         AppendMenu(hMenu, MF_STRING, IDM_BRIGHTNESS_UP, L"Brightness Up (Ctrl+Shift+\x2191)");
         AppendMenu(hMenu, MF_STRING, IDM_BRIGHTNESS_DOWN, L"Brightness Down (Ctrl+Shift+\x2193)");
         
@@ -477,16 +273,14 @@ private:
         MessageBox(hwnd,
             L"Windows Edge Light - Keyboard Shortcuts\n\n"
             L"Toggle Light:  Ctrl + Shift + L\n"
-            L"Toggle Controls:  Ctrl + Shift + C\n"
             L"Brightness Up:  Ctrl + Shift + \x2191\n"
             L"Brightness Down:  Ctrl + Shift + \x2193\n\n"
             L"Features:\n"
-            L"\x2022 Click-through overlay\n"
-            L"\x2022 Adjustable frame thickness\n"
-            L"\x2022 Blur/glow effect\n"
-            L"\x2022 Multi-monitor support\n\n"
-            L"Original concept by Scott Hanselman\n"
-            L"Version 2.1 - Enhanced Edition",
+            L"\x2022 Click-through overlay - won't interfere with your work\n"
+            L"\x2022 Global hotkeys work from any application\n"
+            L"\x2022 Right-click taskbar icon for menu\n\n"
+            L"Created by Scott Hanselman\n"
+            L"Version 2.0 - Ultra-Minimal GDI Edition",
             L"Windows Edge Light - Help",
             MB_OK | MB_ICONINFORMATION);
     }
@@ -529,9 +323,6 @@ private:
                 case HOTKEY_BRIGHTNESS_DOWN:
                     pThis->DecreaseBrightness();
                     break;
-                case HOTKEY_TOGGLE_CONTROLS:
-                    pThis->ToggleControls();
-                    break;
                 }
                 return 0;
 
@@ -555,9 +346,6 @@ private:
                 case IDM_TOGGLE:
                     pThis->ToggleLight();
                     return 0;
-                case IDM_TOGGLE_CONTROLS:
-                    pThis->ToggleControls();
-                    return 0;
                 case IDM_BRIGHTNESS_UP:
                     pThis->IncreaseBrightness();
                     return 0;
@@ -577,69 +365,8 @@ private:
                 UnregisterHotKey(hwnd, HOTKEY_TOGGLE);
                 UnregisterHotKey(hwnd, HOTKEY_BRIGHTNESS_UP);
                 UnregisterHotKey(hwnd, HOTKEY_BRIGHTNESS_DOWN);
-                UnregisterHotKey(hwnd, HOTKEY_TOGGLE_CONTROLS);
                 PostQuitMessage(0);
                 return 0;
-            }
-        }
-
-        return DefWindowProc(hwnd, message, wParam, lParam);
-    }
-
-    static LRESULT CALLBACK ControlWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
-    {
-        EdgeLightWindow* pThis = nullptr;
-
-        if (message == WM_NCCREATE)
-        {
-            CREATESTRUCT* pCreate = reinterpret_cast<CREATESTRUCT*>(lParam);
-            pThis = reinterpret_cast<EdgeLightWindow*>(pCreate->lpCreateParams);
-            SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pThis));
-        }
-        else
-        {
-            pThis = reinterpret_cast<EdgeLightWindow*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
-        }
-
-        if (pThis)
-        {
-            switch (message)
-            {
-            case WM_HSCROLL:
-            {
-                if (lParam)
-                {
-                    int id = GetDlgCtrlID((HWND)lParam);
-                    int pos = (int)SendMessage((HWND)lParam, TBM_GETPOS, 0, 0);
-                    
-                    if (id == IDC_THICKNESS_SLIDER)
-                    {
-                        pThis->SetFrameThickness(pos);
-                    }
-                    else if (id == IDC_BRIGHTNESS_SLIDER)
-                    {
-                        pThis->SetBrightness(pos);
-                    }
-                }
-                return 0;
-            }
-
-            case WM_COMMAND:
-            {
-                switch (LOWORD(wParam))
-                {
-                case IDC_TOGGLE_BTN:
-                    pThis->ToggleLight();
-                    return 0;
-                case IDC_MONITOR_BTN:
-                    pThis->SwitchMonitor();
-                    return 0;
-                case IDC_CLOSE_BTN:
-                    pThis->ToggleControls();
-                    return 0;
-                }
-                break;
-            }
             }
         }
 
