@@ -1,78 +1,24 @@
-# .NET build output
+# Build outputs
 bin/
 obj/
-publish/
+*.exe
+*.obj
+*.res
+*.pdb
+*.ilk
+*.iobj
+*.ipdb
 
-# Visual Studio cache/options
+# CMake
+build/
+build_*/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+
+# Visual Studio
 .vs/
-.vscode/
-
-# Build results
-[Dd]ebug/
-[Rr]elease/
-x64/
-x86/
-[Aa][Rr][Mm]/
-[Aa][Rr][Mm]64/
-bld/
-[Bb]in/
-[Oo]bj/
-[Ll]og/
-[Ll]ogs/
-
-# Visual Studio profiler
-*.psess
-*.vsp
-*.vspx
-*.sap
-
-# User-specific files
-*.rsuser
-*.suo
 *.user
-*.userosscache
-*.sln.docstates
-
-# Mono auto generated files
-mono_crash.*
-
-# Windows image file caches
-Thumbs.db
-ehthumbs.db
-
-# Folder config file
-Desktop.ini
-
-# Recycle Bin used on file shares
-$RECYCLE.BIN/
-
-# VS Code directories
-.vscode/
-
-# JetBrains Rider
-.idea/
-*.sln.iml
-
-# NuGet Packages
-*.nupkg
-*.snupkg
-**/packages/*
-
-# NuGet Symbol Packages
-*.snupkg
-
-# The packages folder can be ignored because of Package Restore
-**/[Pp]ackages/*
-
-# Uncomment if necessary however generally it will be regenerated when needed
-#!**/[Pp]ackages/repositories.config
-
-# Windows Installer files
-*.cab
-*.msi
-*.msix
-*.msm
-*.msp
-
-# Windows shortcuts
-*.lnk
+*.suo
+*.vcxproj.filters
+*.vcxproj.user

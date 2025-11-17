@@ -1,82 +1,77 @@
-# Build script for Windows Edge Light
-# Creates x64 and ARM64 single-file executables
-
+# Build script for Windows Edge Light Native
 param(
     [string]$Configuration = "Release",
-    [string]$Version = ""
+    [string]$Platform = "x64"
 )
 
-# If version not provided, read from csproj
-if ([string]::IsNullOrEmpty($Version)) {
-    Write-Host "Version not specified, reading from project file..." -ForegroundColor Yellow
-    [xml]$projectFile = Get-Content "WindowsEdgeLight\WindowsEdgeLight.csproj"
-    $Version = $projectFile.Project.PropertyGroup.Version | Where-Object { $_ -ne $null } | Select-Object -First 1
+Write-Host "Building Windows Edge Light Native - $Configuration $Platform" -ForegroundColor Cyan
+
+# Check for build tools
+$hasCMake = Get-Command cmake -ErrorAction SilentlyContinue
+$hasNinja = Get-Command ninja -ErrorAction SilentlyContinue
+
+if (-not $hasCMake) {
+    Write-Host "ERROR: CMake not found. Please install CMake or Visual Studio Build Tools." -ForegroundColor Red
+    Write-Host ""
+    Write-Host "Options to install:" -ForegroundColor Yellow
+    Write-Host "1. Install Visual Studio 2022 with C++ Desktop Development workload"
+    Write-Host "2. Install Visual Studio Build Tools: https://aka.ms/vs/17/release/vs_BuildTools.exe"
+    Write-Host "3. Install CMake: winget install Kitware.CMake"
+    Write-Host ""
+    Write-Host "If you have Visual Studio installed, run this from 'Developer PowerShell for VS 2022'"
+    exit 1
+}
+
+# Create build directory
+$buildDir = "build_$Platform"
+if (Test-Path $buildDir) {
+    Remove-Item $buildDir -Recurse -Force
+}
+New-Item -ItemType Directory -Path $buildDir | Out-Null
+
+Push-Location $buildDir
+
+try {
+    Write-Host "Configuring project..." -ForegroundColor Yellow
     
-    if ([string]::IsNullOrEmpty($Version)) {
-        Write-Host "ERROR: Could not read version from WindowsEdgeLight.csproj" -ForegroundColor Red
-        exit 1
+    $generator = "Ninja"
+    if (-not $hasNinja) {
+        $generator = "NMake Makefiles"
     }
     
-    Write-Host "Using version from project file: $Version" -ForegroundColor Green
+    $cmakeArgs = @(
+        ".."
+        "-G", $generator
+        "-DCMAKE_BUILD_TYPE=$Configuration"
+    )
+    
+    if ($Platform -eq "ARM64") {
+        $cmakeArgs += "-A", "ARM64"
+    }
+    
+    & cmake @cmakeArgs
+    
+    if ($LASTEXITCODE -ne 0) {
+        throw "CMake configuration failed"
+    }
+    
+    Write-Host "Building..." -ForegroundColor Yellow
+    & cmake --build . --config $Configuration
+    
+    if ($LASTEXITCODE -ne 0) {
+        throw "Build failed"
+    }
+    
+    Write-Host ""
+    Write-Host "Build successful!" -ForegroundColor Green
+    
+    # Find the exe
+    $exe = Get-ChildItem -Path "." -Filter "WindowsEdgeLightNative.exe" -Recurse | Select-Object -First 1
+    if ($exe) {
+        $size = [math]::Round($exe.Length / 1KB, 2)
+        Write-Host "Executable: $($exe.FullName)" -ForegroundColor Cyan
+        Write-Host "Size: $size KB" -ForegroundColor Cyan
+    }
+} finally {
+    Pop-Location
 }
-
-Write-Host "Building Windows Edge Light v$Version..." -ForegroundColor Cyan
-Write-Host ""
-
-# Clean previous builds
-Write-Host "Cleaning previous builds..." -ForegroundColor Yellow
-if (Test-Path ".\publish") {
-    Remove-Item ".\publish" -Recurse -Force
-}
-New-Item -ItemType Directory -Path ".\publish" | Out-Null
-
-# Build x64 version
-Write-Host ""
-Write-Host "Building x64 version..." -ForegroundColor Green
-dotnet publish WindowsEdgeLight\WindowsEdgeLight.csproj `
-    -c $Configuration `
-    -r win-x64 `
-    /p:DebugType=None `
-    /p:DebugSymbols=false `
-    --self-contained
-
-if ($LASTEXITCODE -eq 0) {
-    Copy-Item "WindowsEdgeLight\bin\$Configuration\net10.0-windows\win-x64\publish\WindowsEdgeLight.exe" `
-              ".\publish\WindowsEdgeLight-v$Version-win-x64.exe"
-    $x64Size = [math]::Round((Get-Item ".\publish\WindowsEdgeLight-v$Version-win-x64.exe").Length / 1MB, 2)
-    Write-Host "✓ x64 build complete: $x64Size MB" -ForegroundColor Green
-} else {
-    Write-Host "✗ x64 build failed" -ForegroundColor Red
-    exit 1
-}
-
-# Build ARM64 version
-Write-Host ""
-Write-Host "Building ARM64 version..." -ForegroundColor Green
-dotnet publish WindowsEdgeLight\WindowsEdgeLight.csproj `
-    -c $Configuration `
-    -r win-arm64 `
-    /p:DebugType=None `
-    /p:DebugSymbols=false `
-    --self-contained
-
-if ($LASTEXITCODE -eq 0) {
-    Copy-Item "WindowsEdgeLight\bin\$Configuration\net10.0-windows\win-arm64\publish\WindowsEdgeLight.exe" `
-              ".\publish\WindowsEdgeLight-v$Version-win-arm64.exe"
-    $arm64Size = [math]::Round((Get-Item ".\publish\WindowsEdgeLight-v$Version-win-arm64.exe").Length / 1MB, 2)
-    Write-Host "✓ ARM64 build complete: $arm64Size MB" -ForegroundColor Green
-} else {
-    Write-Host "✗ ARM64 build failed" -ForegroundColor Red
-    exit 1
-}
-
-# Summary
-Write-Host ""
-Write-Host "Build Complete!" -ForegroundColor Cyan
-Write-Host "==================" -ForegroundColor Cyan
-Get-ChildItem ".\publish\*.exe" | ForEach-Object {
-    $size = [math]::Round($_.Length / 1MB, 2)
-    Write-Host "$($_.Name) - $size MB" -ForegroundColor White
-}
-Write-Host ""
-Write-Host "Output directory: .\publish\" -ForegroundColor Yellow
