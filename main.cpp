@@ -309,7 +309,7 @@ private:
             
             // Draw blur/glow layers on both inner and outer edges
             int intensity = (255 * currentOpacity) / 255;
-            int blurSize = 5; // Smaller blur radius
+            int blurSize = 2; // Very subtle blur radius
             
             // Outer blur (outside the frame)
             for (int i = blurSize; i >= 1; i--)
