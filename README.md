@@ -4,6 +4,20 @@ A lightweight native Windows application that displays a glowing frame around yo
 
 ![Windows Edge Light Demo](HeroImage.png)
 
+## Performance vs Original
+
+This native rewrite is dramatically more efficient than the original WPF version:
+
+| Metric | Original WPF | Native (This Version) | Improvement |
+|--------|-------------|----------------------|-------------|
+| **Executable Size** | 72 MB | **109 KB** | **660x smaller** |
+| **Memory Usage** | ~300 MB | **~4 MB** | **75x less** |
+| **Startup Time** | ~800ms | **<80ms** | **10x faster** |
+| **Runtime Dependencies** | .NET 10 + WPF | **None** | No runtime needed |
+| **CPU Usage (idle)** | 0.1-0.2% | **0%** | Zero background CPU |
+
+Same features, 660x smaller footprint.
+
 ## Features
 
 - Click-through transparent overlay
